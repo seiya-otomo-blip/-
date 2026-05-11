@@ -1,0 +1,7 @@
+# 日次レポート: 平日18:00に実行
+# インストール方法:
+#   crontab -e  # 以下の行を追加
+#   または: crontab daily_report.cron
+#
+# 書式: 分 時 日 月 曜日(1=月〜5=金)
+0 18 * * 1-5 /home/user/-/daily_report.sh
