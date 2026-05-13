@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mac launchd による平日18:00スケジュール設定
+
+  【インストール手順】
+  1. このファイルを ~/Library/LaunchAgents/com.seiya-otomo.daily-report.plist にコピー
+  2. /path/to/daily_report.sh を実際のスクリプトパスに置き換える
+  3. launchctl load ~/Library/LaunchAgents/com.seiya-otomo.daily-report.plist
+
+  【注意】
+  launchd は平日判定ができないため、スクリプト側(daily_report.sh)で
+  平日チェックを行っています。毎日18:00に起動されますが、
+  土日は script 内の曜日チェックで処理をスキップします。
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.seiya-otomo.daily-report</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/path/to/daily_report.sh</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>18</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/daily_report.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/daily_report_error.log</string>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>
