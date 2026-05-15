@@ -1,0 +1,59 @@
+name: Daily Report (平日18時)
+
+on:
+  schedule:
+    - cron: '0 9 * * 1-5'  # 平日 18:00 JST（= 09:00 UTC）
+  workflow_dispatch:        # 手動実行も可能
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic/claude-code
+
+      - name: Write MCP config
+        run: |
+          mkdir -p ~/.claude
+          cat > ~/.claude/mcp_settings.json << 'EOF'
+          {
+            "mcpServers": {
+              "Slack": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-slack"],
+                "env": {
+                  "SLACK_BOT_TOKEN": "${{ secrets.SLACK_BOT_TOKEN }}",
+                  "SLACK_TEAM_ID": "${{ secrets.SLACK_TEAM_ID }}"
+                }
+              },
+              "Gmail": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-gmail"],
+                "env": {
+                  "GMAIL_CREDENTIALS": "${{ secrets.GMAIL_CREDENTIALS }}"
+                }
+              },
+              "Google-Calendar": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-google-calendar"],
+                "env": {
+                  "GOOGLE_CREDENTIALS": "${{ secrets.GOOGLE_CREDENTIALS }}"
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Run daily report
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: bash daily_report.sh
