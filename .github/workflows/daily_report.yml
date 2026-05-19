@@ -1,0 +1,74 @@
+name: Daily Report (平日 18:00 JST)
+
+on:
+  schedule:
+    # 09:00 UTC = 18:00 JST、月〜金のみ
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Setup MCP config
+        env:
+          SESSION_UUID: ${{ secrets.CLAUDE_SESSION_UUID }}
+          SLACK_MCP_SERVER_ID: ${{ secrets.SLACK_MCP_SERVER_ID }}
+          SLACK_TOOLBOX_MCP_SERVER_ID: ${{ secrets.SLACK_TOOLBOX_MCP_SERVER_ID }}
+          GMAIL_MCP_SERVER_ID: ${{ secrets.GMAIL_MCP_SERVER_ID }}
+          GMAIL_TOOLBOX_MCP_SERVER_ID: ${{ secrets.GMAIL_TOOLBOX_MCP_SERVER_ID }}
+          GCAL_MCP_SERVER_ID: ${{ secrets.GCAL_MCP_SERVER_ID }}
+          GCAL_TOOLBOX_MCP_SERVER_ID: ${{ secrets.GCAL_TOOLBOX_MCP_SERVER_ID }}
+        run: |
+          cat > /tmp/mcp-config.json << MCPEOF
+          {
+            "mcpServers": {
+              "Slack": {
+                "type": "sse",
+                "url": "https://api.anthropic.com/v2/ccr-sessions/${SESSION_UUID}/mcp?mcp_url=https%3A%2F%2Fmcp.slack.com%2Fmcp&mcp_server_id=${SLACK_MCP_SERVER_ID}&toolbox_mcp_server_id=${SLACK_TOOLBOX_MCP_SERVER_ID}",
+                "headers": {
+                  "X-Session-UUID": "${SESSION_UUID}",
+                  "X-MCP-Server-ID": "${SLACK_TOOLBOX_MCP_SERVER_ID}"
+                }
+              },
+              "Gmail": {
+                "type": "sse",
+                "url": "https://api.anthropic.com/v2/ccr-sessions/${SESSION_UUID}/mcp?mcp_url=https%3A%2F%2Fgmail.mcp.claude.com%2Fmcp&mcp_server_id=${GMAIL_MCP_SERVER_ID}&toolbox_mcp_server_id=${GMAIL_TOOLBOX_MCP_SERVER_ID}",
+                "headers": {
+                  "X-Session-UUID": "${SESSION_UUID}",
+                  "X-MCP-Server-ID": "${GMAIL_TOOLBOX_MCP_SERVER_ID}"
+                }
+              },
+              "Google-Calendar": {
+                "type": "sse",
+                "url": "https://api.anthropic.com/v2/ccr-sessions/${SESSION_UUID}/mcp?mcp_url=https%3A%2F%2Fgcal.mcp.claude.com%2Fmcp&mcp_server_id=${GCAL_MCP_SERVER_ID}&toolbox_mcp_server_id=${GCAL_TOOLBOX_MCP_SERVER_ID}",
+                "headers": {
+                  "X-Session-UUID": "${SESSION_UUID}",
+                  "X-MCP-Server-ID": "${GCAL_TOOLBOX_MCP_SERVER_ID}"
+                }
+              }
+            }
+          }
+          MCPEOF
+
+      - name: Run daily report
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          export PATH="/usr/local/bin:$PATH"
+          bash daily_report.sh
