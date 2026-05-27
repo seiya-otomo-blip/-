@@ -1,0 +1,27 @@
+name: Daily Report (18:00 JST Weekdays)
+
+on:
+  schedule:
+    # 毎週月〜金 18:00 JST = 09:00 UTC
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run Daily Report
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: bash daily_report.sh
