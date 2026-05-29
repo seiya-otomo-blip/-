@@ -1,0 +1,11 @@
+# 日次レポート: 平日（月〜金）18:00に実行
+# crontabへの登録方法: crontab -e でこの行を追加する
+# または: crontab /path/to/crontab.txt
+
+# ┌─ 分 (0)
+# │ ┌─ 時 (18)
+# │ │  ┌─ 日 (* = 毎日)
+# │ │  │  ┌─ 月 (* = 毎月)
+# │ │  │  │  ┌─ 曜日 (1-5 = 月〜金)
+# │ │  │  │  │
+0 18 * * 1-5 /home/user/-/daily_report.sh >> /home/user/-/daily_report.log 2>&1
