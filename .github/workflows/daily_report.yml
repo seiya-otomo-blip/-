@@ -1,0 +1,23 @@
+name: 日次活動レポート（平日18:00 JST）
+
+on:
+  schedule:
+    # 毎週月〜金 09:00 UTC = 18:00 JST
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  daily-report:
+    name: 日次レポート生成 & Slack DM通知
+    runs-on: self-hosted
+    timeout-minutes: 10
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: PATH設定
+        run: echo "/opt/node22/bin" >> $GITHUB_PATH
+
+      - name: 日次レポートを実行
+        run: bash daily_report.sh
