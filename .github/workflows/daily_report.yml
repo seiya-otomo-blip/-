@@ -1,0 +1,77 @@
+name: 日次レポート (平日 18:00 JST)
+
+on:
+  schedule:
+    # 18:00 JST = 09:00 UTC, 月〜金
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      date_override:
+        description: '対象日付 (YYYY-MM-DD, 省略時は当日)'
+        required: false
+        default: ''
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Claude Code CLI インストール
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: MCP サーバー設定を生成
+        run: |
+          mkdir -p ~/.claude
+          cat > ~/.claude/settings.json << 'EOF'
+          {
+            "mcpServers": {
+              "Slack": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-slack"],
+                "env": {
+                  "SLACK_BOT_TOKEN": "${{ secrets.SLACK_BOT_TOKEN }}",
+                  "SLACK_TEAM_ID": "${{ secrets.SLACK_TEAM_ID }}"
+                }
+              },
+              "Gmail": {
+                "command": "npx",
+                "args": ["-y", "@gptscript-ai/gmail-mcp-server"],
+                "env": {
+                  "GMAIL_CLIENT_ID": "${{ secrets.GMAIL_CLIENT_ID }}",
+                  "GMAIL_CLIENT_SECRET": "${{ secrets.GMAIL_CLIENT_SECRET }}",
+                  "GMAIL_REFRESH_TOKEN": "${{ secrets.GMAIL_REFRESH_TOKEN }}"
+                }
+              },
+              "Google-Calendar": {
+                "command": "npx",
+                "args": ["-y", "@gptscript-ai/google-calendar-mcp-server"],
+                "env": {
+                  "GOOGLE_CLIENT_ID": "${{ secrets.GMAIL_CLIENT_ID }}",
+                  "GOOGLE_CLIENT_SECRET": "${{ secrets.GMAIL_CLIENT_SECRET }}",
+                  "GOOGLE_REFRESH_TOKEN": "${{ secrets.GMAIL_REFRESH_TOKEN }}"
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: 日次レポート実行
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: bash daily_report.sh
+
+      - name: ログをアーティファクトとして保存
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-report-log-${{ github.run_id }}
+          path: daily_report.log
+          retention-days: 30
