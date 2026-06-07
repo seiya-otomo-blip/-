@@ -1,0 +1,94 @@
+name: Daily Report (18:00 JST, weekdays)
+
+on:
+  schedule:
+    # 09:00 UTC = 18:00 JST, 月〜金
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch: # 手動実行も可能
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Claude CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Write MCP config
+        run: |
+          cat > /tmp/mcp-config.json << EOF
+          {
+            "mcpServers": {
+              "Slack": {
+                "type": "http",
+                "url": "https://mcp.slack.com/mcp",
+                "headers": {
+                  "Authorization": "Bearer ${{ secrets.SLACK_MCP_TOKEN }}"
+                }
+              },
+              "Gmail": {
+                "type": "http",
+                "url": "https://gmail.mcp.claude.com/mcp",
+                "headers": {
+                  "Authorization": "Bearer ${{ secrets.GMAIL_MCP_TOKEN }}"
+                }
+              },
+              "Google-Calendar": {
+                "type": "http",
+                "url": "https://gcal.mcp.claude.com/mcp",
+                "headers": {
+                  "Authorization": "Bearer ${{ secrets.GCAL_MCP_TOKEN }}"
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Run daily report
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          TODAY=$(date '+%Y/%m/%d' --date='TZ="Asia/Tokyo"' 2>/dev/null || date '+%Y/%m/%d')
+          TODAY_ISO=$(date '+%Y-%m-%d' --date='TZ="Asia/Tokyo"' 2>/dev/null || date '+%Y-%m-%d')
+
+          claude --mcp-config /tmp/mcp-config.json -p "
+          あなたは日次レポートアシスタントです。以下の手順を実行してください。
+
+          今日の日付: ${TODAY}
+
+          1. Googleカレンダーから今日（${TODAY_ISO}T00:00:00〜${TODAY_ISO}T23:59:59、Asia/Tokyo）のイベントを全て取得する
+
+          2. Slackで自分（U01SC3UBKMX）が今日（${TODAY_ISO}）投稿したメッセージを全チャンネルから取得する
+             検索クエリ: 'from:<@U01SC3UBKMX> after:${TODAY_ISO}'
+
+          3. Gmailで今日（newer_than:1d）に返信があったスレッドを取得する
+
+          4. 取得した全データを時刻の古い順に整理し、以下フォーマットで Slack DM（U01SC3UBKMX）に送信する:
+
+          📊 *日次レポート* ${TODAY}
+
+          *📅 Googleカレンダー*
+          • HH:MM 〜 HH:MM　イベント名
+          （予定なしの場合: 本日の予定はありません）
+
+          *💬 Slack投稿*
+          • HH:MM　[#チャンネル] 投稿内容の要約（30字以内）
+          （投稿なしの場合: 本日のSlack投稿はありません）
+
+          *📧 Gmail返信*
+          • HH:MM　件名（送信者→受信者）
+          （なしの場合: 本日のGmail返信はありません）
+
+          必ず最後に Slack DM を U01SC3UBKMX に送信すること。
+          " \
+            --allowedTools "mcp__Slack__slack_search_public_and_private,mcp__Slack__slack_send_message,mcp__Gmail__search_threads,mcp__Google-Calendar__list_events" \
+            --output-format text
