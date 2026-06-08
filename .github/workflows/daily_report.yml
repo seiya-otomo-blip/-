@@ -1,0 +1,66 @@
+name: Daily Report
+
+on:
+  schedule:
+    # 毎週月〜金 18:00 JST (= 09:00 UTC)
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:
+    # 手動実行でテスト可能
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run daily report via Claude Code
+        uses: anthropics/claude-code-action@beta
+        with:
+          prompt: |
+            以下の手順を実行してください。
+
+            【対象ユーザー】seiya-otomo (Slack user_id: U01SC3UBKMX)
+
+            ## 手順1: Googleカレンダーのスケジュール取得
+            本日のカレンダーイベントを取得する（list_events）。
+
+            ## 手順2: Slackの自分の投稿取得
+            本日 seiya-otomo が送信したSlackメッセージを検索する。
+            検索クエリ: 'from:seiya-otomo after:TODAY'
+
+            ## 手順3: Gmailの返信メール取得
+            本日受信したメールスレッドを取得する。
+            検索クエリ: 'after:TODAY is:inbox'
+
+            ## 手順4: 日次レポート作成
+            上記を時系列でまとめ、以下のフォーマットで作成:
+
+            【日次レポート】YYYY/MM/DD
+
+            📅 本日のスケジュール
+            （予定一覧）
+
+            💬 Slack投稿
+            （自分の投稿一覧）
+
+            📧 受信メール
+            （受信メール一覧）
+
+            ## 手順5: Slack DM送信
+            レポートを seiya-otomo (U01SC3UBKMX) 本人のDMに送信する。
+          allowed_tools: >-
+            mcp__Slack__slack_search_public_and_private,
+            mcp__Slack__slack_read_thread,
+            mcp__Slack__slack_send_message,
+            mcp__Slack__slack_search_users,
+            mcp__Slack__slack_read_channel,
+            mcp__Gmail__search_threads,
+            mcp__Gmail__get_thread,
+            mcp__Google-Calendar__list_events,
+            mcp__Google-Calendar__list_calendars
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
