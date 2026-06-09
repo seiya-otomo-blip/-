@@ -1,0 +1,57 @@
+name: 日次レポート送信（平日18時）
+
+on:
+  schedule:
+    # 毎週平日 18:00 JST (= 09:00 UTC)
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: 日次レポートを実行
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          timeout_minutes: "10"
+          direct_prompt: |
+            今日の日次レポートを作成して、自分のSlack DM（user_id: U01SC3UBKMX）に送信してください。
+
+            【手順】
+
+            1. **Googleカレンダーのスケジュール取得**
+               - 今日のカレンダーイベントをすべて取得（Asia/Tokyo タイムゾーン）
+               - 時間順に並べる
+
+            2. **Slackの自分の投稿を取得**
+               - 検索クエリ: 'from:<@U01SC3UBKMX>'（本日分）
+               - 今日自分が投稿したメッセージを時系列で収集
+
+            3. **Gmailの返信を取得**
+               - 今日受信したメール（to:me newer_than:1d）を時系列で取得
+               - 件名・送信者・受信時刻を収集
+
+            4. **日次レポートを作成してSlack DMに送信**
+               フォーマット：
+               ━━━━━━━━━━━━━━━━━━━━━━
+               📋 *日次レポート YYYY/MM/DD*
+               ━━━━━━━━━━━━━━━━━━━━━━
+
+               📅 *本日のスケジュール*
+               • HH:MM〜HH:MM　イベント名
+
+               💬 *Slackの自分の投稿*
+               • HH:MM　[チャンネル名] 投稿内容の要約
+
+               📧 *Gmailの返信*
+               • HH:MM　件名（送信者）
+               ━━━━━━━━━━━━━━━━━━━━━━
+
+               各セクションにデータがない場合は「該当なし」と記載する。
+          allowed_tools: "mcp__e59ce691-91d7-47bc-a81b-1f5cc340e15a__slack_search_public_and_private,mcp__e59ce691-91d7-47bc-a81b-1f5cc340e15a__slack_read_thread,mcp__e59ce691-91d7-47bc-a81b-1f5cc340e15a__slack_send_message,mcp__e59ce691-91d7-47bc-a81b-1f5cc340e15a__slack_read_channel,mcp__ec8b2c1c-d01c-4297-8a5e-afc11958c457__search_threads,mcp__ec8b2c1c-d01c-4297-8a5e-afc11958c457__get_thread,mcp__4abecda0-f819-4c96-8704-7e8adce94aab__list_events,mcp__4abecda0-f819-4c96-8704-7e8adce94aab__list_calendars"
