@@ -1,0 +1,74 @@
+name: Daily Report (Weekdays 18:00 JST)
+
+on:
+  schedule:
+    # 09:00 UTC = 18:00 JST, Mon-Fri
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Daily Report via Claude Code
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            以下の手順で日次レポートを作成してSlack DMに送信してください。
+
+            ## 実行手順
+
+            1. **Slackの自分の投稿を取得**
+               - `slack_search_public_and_private` で `from:<@U01SC3UBKMX> after:<今日の日付>` を検索
+               - タイムスタンプ昇順で取得
+
+            2. **Gmailの送信メールを取得**
+               - `search_threads` で `from:seiya-otomo@plex.co.jp after:<今日の日付YYYY/MM/DD>` を検索
+
+            3. **Googleカレンダーの本日のスケジュールを取得**
+               - `list_events` で本日00:00〜23:59（Asia/Tokyo）のイベントを取得
+               - `orderBy: startTime` で昇順取得
+
+            4. **日次レポートを作成**
+               - 時系列でまとめ、カレンダー・Gmail・Slackの3セクションに整理
+               - 日本語で作成
+
+            5. **自分のSlack DMに送信**
+               - `slack_send_message` で `channel_id: U01SC3UBKMX` に送信
+               - レポートフォーマットは今日の日付を含めること
+
+          mcp_config: |
+            {
+              "mcpServers": {
+                "slack": {
+                  "command": "npx",
+                  "args": ["-y", "@modelcontextprotocol/server-slack"],
+                  "env": {
+                    "SLACK_BOT_TOKEN": "${{ secrets.SLACK_BOT_TOKEN }}",
+                    "SLACK_TEAM_ID": "${{ secrets.SLACK_TEAM_ID }}"
+                  }
+                },
+                "gmail": {
+                  "command": "npx",
+                  "args": ["-y", "@modelcontextprotocol/server-gmail"],
+                  "env": {
+                    "GMAIL_CLIENT_ID": "${{ secrets.GMAIL_CLIENT_ID }}",
+                    "GMAIL_CLIENT_SECRET": "${{ secrets.GMAIL_CLIENT_SECRET }}",
+                    "GMAIL_REFRESH_TOKEN": "${{ secrets.GMAIL_REFRESH_TOKEN }}"
+                  }
+                },
+                "google-calendar": {
+                  "command": "npx",
+                  "args": ["-y", "@modelcontextprotocol/server-google-calendar"],
+                  "env": {
+                    "GOOGLE_CLIENT_ID": "${{ secrets.GOOGLE_CLIENT_ID }}",
+                    "GOOGLE_CLIENT_SECRET": "${{ secrets.GOOGLE_CLIENT_SECRET }}",
+                    "GOOGLE_REFRESH_TOKEN": "${{ secrets.GOOGLE_REFRESH_TOKEN }}"
+                  }
+                }
+              }
+            }
