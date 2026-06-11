@@ -1,0 +1,82 @@
+name: 日次レポート通知
+
+on:
+  schedule:
+    # 毎週月〜金 18:00 JST (= UTC 09:00)
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'テスト実行（ログのみ、Slack送信なし）'
+        required: false
+        default: 'false'
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Configure Claude Code MCP servers
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+        run: |
+          mkdir -p ~/.claude
+          cat > ~/.claude/settings.json << EOF
+          {
+            "mcpServers": {
+              "Slack": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-slack"],
+                "env": {
+                  "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}"
+                }
+              },
+              "Gmail": {
+                "command": "npx",
+                "args": ["-y", "mcp-gmail"],
+                "env": {
+                  "GOOGLE_CLIENT_ID": "${GOOGLE_CLIENT_ID}",
+                  "GOOGLE_CLIENT_SECRET": "${GOOGLE_CLIENT_SECRET}",
+                  "GOOGLE_REFRESH_TOKEN": "${GOOGLE_REFRESH_TOKEN}"
+                }
+              },
+              "Google-Calendar": {
+                "command": "npx",
+                "args": ["-y", "mcp-google-calendar"],
+                "env": {
+                  "GOOGLE_CLIENT_ID": "${GOOGLE_CLIENT_ID}",
+                  "GOOGLE_CLIENT_SECRET": "${GOOGLE_CLIENT_SECRET}",
+                  "GOOGLE_REFRESH_TOKEN": "${GOOGLE_REFRESH_TOKEN}"
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Run daily report
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: bash daily_report.sh
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-report-log-${{ github.run_id }}
+          path: daily_report.log
+          retention-days: 30
