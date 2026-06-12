@@ -1,0 +1,115 @@
+name: Daily Report (平日18:00 JST)
+
+on:
+  schedule:
+    # 18:00 JST (UTC+9) = 09:00 UTC、月〜金のみ
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:
+    # 手動実行用（テスト時など）
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Daily Report via Claude Code
+        uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # MCP サーバー設定
+          # 必要なシークレットを GitHub リポジトリの Settings > Secrets and variables > Actions に追加してください:
+          #   SLACK_BOT_TOKEN       : Slack Bot User OAuth Token (xoxb-...)
+          #   SLACK_TEAM_ID         : Slack ワークスペースの Team ID
+          #   GMAIL_CLIENT_ID       : Google OAuth クライアントID
+          #   GMAIL_CLIENT_SECRET   : Google OAuth クライアントシークレット
+          #   GMAIL_REFRESH_TOKEN   : Google OAuth リフレッシュトークン
+          claude_mcp_config: |
+            {
+              "mcpServers": {
+                "Slack": {
+                  "command": "npx",
+                  "args": ["-y", "@modelcontextprotocol/server-slack"],
+                  "env": {
+                    "SLACK_BOT_TOKEN": "${{ secrets.SLACK_BOT_TOKEN }}",
+                    "SLACK_TEAM_ID": "${{ secrets.SLACK_TEAM_ID }}"
+                  }
+                },
+                "Gmail": {
+                  "command": "npx",
+                  "args": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
+                  "env": {
+                    "GMAIL_OAUTH_CLIENT_ID": "${{ secrets.GMAIL_CLIENT_ID }}",
+                    "GMAIL_OAUTH_CLIENT_SECRET": "${{ secrets.GMAIL_CLIENT_SECRET }}",
+                    "GMAIL_OAUTH_REFRESH_TOKEN": "${{ secrets.GMAIL_REFRESH_TOKEN }}"
+                  }
+                },
+                "Google-Calendar": {
+                  "command": "npx",
+                  "args": ["-y", "@modelcontextprotocol/server-google-calendar"],
+                  "env": {
+                    "GOOGLE_OAUTH_CLIENT_ID": "${{ secrets.GMAIL_CLIENT_ID }}",
+                    "GOOGLE_OAUTH_CLIENT_SECRET": "${{ secrets.GMAIL_CLIENT_SECRET }}",
+                    "GOOGLE_OAUTH_REFRESH_TOKEN": "${{ secrets.GMAIL_REFRESH_TOKEN }}"
+                  }
+                }
+              }
+            }
+
+          allowed_tools: >-
+            mcp__Slack__slack_search_public_and_private,
+            mcp__Slack__slack_read_channel,
+            mcp__Slack__slack_read_thread,
+            mcp__Slack__slack_send_message,
+            mcp__Slack__slack_search_users,
+            mcp__Gmail__search_threads,
+            mcp__Gmail__get_thread,
+            mcp__Google-Calendar__list_events,
+            mcp__Google-Calendar__list_calendars
+
+          prompt: |
+            あなたは日次レポートアシスタントです。以下の手順を順番に実行してください。
+
+            今日の日付: $(date '+%Y/%m/%d' 2>/dev/null || echo "本日")
+            自分のSlack user_id: U01SC3UBKMX
+
+            ## STEP 1: Slackの本日の自分の投稿を取得
+            - 検索クエリ: 'from:<@U01SC3UBKMX> after:TODAY_ISO'（TODAY_ISOは今日のYYYY-MM-DD形式）
+            - 投稿チャンネル・内容の概要・タイムスタンプ（時刻）を記録する
+            - スレッド返信も含めて取得する
+
+            ## STEP 2: Gmailの本日受信した返信メールを取得
+            - 検索クエリ: 'newer_than:1d in:inbox'
+            - 件名・送信者・受信時刻を記録する（本文は不要、件名と送信者のみ）
+
+            ## STEP 3: Googleカレンダーの本日のスケジュールを取得
+            - 本日のイベントを取得（TODAY_ISOT00:00:00 〜 TODAY_ISOT23:59:59）
+            - イベント名・開始時刻・終了時刻・参加者を記録する
+
+            ## STEP 4: 時系列で整理してSlack DMを送信
+            上記3つの情報を時刻順（早い順）に並べ、以下の形式でU01SC3UBKMXへSlack DMを送信してください:
+
+            【日次レポート】TODAY
+
+            📅 本日のスケジュール・活動サマリー
+            ━━━━━━━━━━━━━━━━━━━━
+
+            [時刻] 絵文字 内容 (種別)
+            例:
+            09:00–10:00 📅 朝会 _(Google Calendar)_
+            10:15 💬 #general にメッセージ投稿: 「XXXについて...」 _(Slack)_
+            11:30 📧 田中さんから返信: 件名「Re: XXX」 _(Gmail)_
+            ...
+
+            （データがない種別は「なし」と表記）
+
+            ━━━━━━━━━━━━━━━━━━━━
+            📊 本日のサマリー
+            • 📅 予定: N件
+            • 💬 Slack投稿: N件
+            • 📧 受信メール返信: N件
+
+            必ず最後にSlack DM（channel_id: U01SC3UBKMX）を送信すること。
